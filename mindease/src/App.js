@@ -3,31 +3,90 @@ import './App.css';
 
 // PUBLIC_INTERFACE
 function App() {
-  // Simple page state: 'home', 'login', 'dashboard'
+  // Page options: 'home', 'login', 'signup', 'dashboard'
   const [page, setPage] = useState('home');
-  // To manage login, keep a mock auth state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Holds authentication state: null if logged out, else user object {email}
+  const [authUser, setAuthUser] = useState(null);
+  // Handles feedback messages for UI (login/signup error/success)
+  const [feedback, setFeedback] = useState({ type: '', msg: '' });
+
+  // Helper to get list of registered users from localStorage
+  function getUsers() {
+    const usersStr = localStorage.getItem('mindease_users');
+    if (!usersStr) return [];
+    try { return JSON.parse(usersStr); } catch {
+      return [];
+    }
+  }
+
+  // Helper to save list of users
+  function setUsers(users) {
+    localStorage.setItem('mindease_users', JSON.stringify(users));
+  }
 
   // PUBLIC_INTERFACE
   function handleLogin(e) {
     e.preventDefault();
-    setIsAuthenticated(true);
+    const form = e.target;
+    const email = form.email.value.trim();
+    const password = form.password.value;
+    const users = getUsers();
+    const user = users.find(u => u.email === email);
+    if (!user) {
+      setFeedback({ type: 'error', msg: 'User not found. Please sign up first.' });
+      return;
+    }
+    if (user.password !== password) {
+      setFeedback({ type: 'error', msg: 'Incorrect password.' });
+      return;
+    }
+    setFeedback({ type: 'success', msg: 'Login successful!' });
+    setAuthUser({ email });
     setPage('dashboard');
+    form.reset();
+  }
+
+  // PUBLIC_INTERFACE
+  function handleSignup(e) {
+    e.preventDefault();
+    const form = e.target;
+    const email = form.email.value.trim();
+    const password = form.password.value;
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setFeedback({ type: 'error', msg: 'Please use a valid email.' });
+      return;
+    }
+    if (password.length < 5) {
+      setFeedback({ type: 'error', msg: 'Password should be at least 5 characters.' });
+      return;
+    }
+    const users = getUsers();
+    if (users.find(u => u.email === email)) {
+      setFeedback({ type: 'error', msg: 'Email is already registered. Please log in.' });
+      return;
+    }
+    users.push({ email, password });
+    setUsers(users);
+    setFeedback({ type: 'success', msg: 'Signup successful! Please log in.' });
+    setPage('login');
+    form.reset();
   }
 
   // PUBLIC_INTERFACE
   function handleLogout() {
-    setIsAuthenticated(false);
+    setAuthUser(null);
     setPage('home');
+    setFeedback({ type: '', msg: '' });
   }
 
   // NAVIGATION scroll or page route
   function handleNav(to) {
+    setFeedback({ type: '', msg: '' });
     if (to === 'login') setPage('login');
+    else if (to === 'signup') setPage('signup');
     else if (to === 'dashboard') setPage('dashboard');
     else {
       setPage('home');
-      // If hashed sections, scroll
       const elem = document.getElementById(to);
       if (elem) elem.scrollIntoView({ behavior: 'smooth' });
     }
@@ -45,6 +104,10 @@ function App() {
             Take self-assessment tests, chat with our AI Therapist, and get insights—all for free!
           </div>
           <button className="btn btn-large" onClick={() => handleNav('login')}>Get Started</button>
+          <div style={{ marginTop: 10 }}>
+            <span>New here?{' '}</span>
+            <button className="link-btn" type="button" onClick={() => handleNav('signup')}>Sign Up</button>
+          </div>
         </section>
 
         <section className="about-mission" id="about">
@@ -124,13 +187,62 @@ function App() {
   function LoginPage() {
     return (
       <div className="login-page">
-        <form className="login-form" onSubmit={handleLogin}>
+        <form className="login-form" onSubmit={handleLogin} autoComplete="on">
           <h2>Login</h2>
-          <input className="form-input" type="email" placeholder="Email" required />
-          <input className="form-input" type="password" placeholder="Password" required />
+          {feedback.msg && (
+            <div
+              style={{
+                color: feedback.type === 'error' ? 'var(--danger)' : 'green',
+                fontWeight: 500,
+                minHeight: 22,
+              }}
+              role={feedback.type === 'error' ? 'alert' : 'status'}
+            >
+              {feedback.msg}
+            </div>
+          )}
+          <input className="form-input" type="email" name="email" placeholder="Email" required autoComplete="username"/>
+          <input className="form-input" type="password" name="password" placeholder="Password" required autoComplete="current-password"/>
           <button className="btn btn-large" type="submit">Login</button>
-          <div className="back-link">
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1em' }}>
             <button type="button" className="link-btn" onClick={() => handleNav('home')}>Back to Home</button>
+            <span>
+              New user?&nbsp;
+              <button type="button" className="link-btn" onClick={() => handleNav('signup')}>Sign Up</button>
+            </span>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // SIGNUP PAGE
+  function SignupPage() {
+    return (
+      <div className="login-page">
+        <form className="login-form" onSubmit={handleSignup} autoComplete="on">
+          <h2>Sign Up</h2>
+          {feedback.msg && (
+            <div
+              style={{
+                color: feedback.type === 'error' ? 'var(--danger)' : 'green',
+                fontWeight: 500,
+                minHeight: 22,
+              }}
+              role={feedback.type === 'error' ? 'alert' : 'status'}
+            >
+              {feedback.msg}
+            </div>
+          )}
+          <input className="form-input" type="email" name="email" placeholder="Email" required autoComplete="username"/>
+          <input className="form-input" type="password" name="password" placeholder="Password (min 5 chars)" required autoComplete="new-password"/>
+          <button className="btn btn-large" type="submit">Sign Up</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1em' }}>
+            <button type="button" className="link-btn" onClick={() => handleNav('home')}>Back to Home</button>
+            <span>
+              Already have an account?&nbsp;
+              <button type="button" className="link-btn" onClick={() => handleNav('login')}>Login</button>
+            </span>
           </div>
         </form>
       </div>
@@ -188,13 +300,17 @@ function App() {
               <button className="nav-link" onClick={() => handleNav('mission')}>Our Mission</button>
               <button className="nav-link" onClick={() => handleNav('features')}>Features</button>
               <button className="nav-link" onClick={() => handleNav('contact')}>Contact</button>
-              {!isAuthenticated ?
-                <button className="btn" onClick={() => setPage('login')}>Login</button>
-                : <button className="btn" onClick={handleLogout}>Logout</button>
-              }
-              {isAuthenticated &&
-                <button className="btn" onClick={() => setPage('dashboard')}>Dashboard</button>
-              }
+              {!authUser ? (
+                <>
+                  <button className="btn" onClick={() => handleNav('login')}>Login</button>
+                  <button className="btn" onClick={() => handleNav('signup')}>Sign Up</button>
+                </>
+              ) : (
+                <>
+                  <button className="btn" onClick={handleLogout}>Logout</button>
+                  <button className="btn" onClick={() => handleNav('dashboard')}>Dashboard</button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -203,7 +319,8 @@ function App() {
         <div className="container">
           {page === 'home' && <HomePage />}
           {page === 'login' && <LoginPage />}
-          {page === 'dashboard' && isAuthenticated && <DashboardPage />}
+          {page === 'signup' && <SignupPage />}
+          {page === 'dashboard' && authUser && <DashboardPage />}
         </div>
       </main>
       <footer className="footer">
